@@ -12,7 +12,7 @@ dataset:
     num_images: 60
 
 run:
-  n_epochs: 50
+  n_epochs: 100
   current_epoch: 0
   plots:
     enable: True
@@ -27,8 +27,8 @@ logging:
     save_dir: "../wandb"
     project: "net-fragments"
     log_model: True
-    group: null
-    job_type: null
+    group: v3
+    job_type: train
   console:
     active: True
 
@@ -36,7 +36,9 @@ n_alternative_cells: 10
 
 feature_extractor:
   out_channels: 4
-  bin_threshold: 0.  # set to 0.5 to obtain better features
+  s1_params:
+    use_larger_weights: False
+    threshold_f: 'threshold'
 
 lateral_model:
   channels: 4

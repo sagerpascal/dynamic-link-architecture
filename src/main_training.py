@@ -153,12 +153,6 @@ def cycle(
     with torch.no_grad():
         features = feature_extractor(batch)
 
-    # features = feature_extractor.binarize_features(features)
-    # features = torch.clip(features, 0, 1)
-    # features = torch.where(features > 0., features, torch.zeros_like(features))
-
-    features = torch.where(features > 0, 1., 0.)
-
     z = None
 
     input_features, lateral_features, lateral_features_f, l2_features, l2h_features = [], [], [], [], []

@@ -167,13 +167,15 @@ class LateralLayer(nn.Module):
         return W_lateral
 
     def calculate_correlations(self, x: Tensor, y: Tensor) -> Tuple[Tensor, Tensor]:
-        assert torch.all((x == 0.) | (x == 1.)), "x not binary"
-        assert torch.all((y == 0.) | (y == 1.)), "y not binary"
+        # assert torch.all((x == 0.) | (x == 1.)), "x not binary"
+        # assert torch.all((y == 0.) | (y == 1.)), "y not binary"
         x_v = x.permute(0, 2, 3, 1).reshape(-1, 1, x.shape[1])
         y_v = y.permute(0, 2, 3, 1).reshape(-1, y.shape[1], 1)
-        pos_co_activation = torch.matmul(y_v, x_v)
+        pos_co_activation = torch.clip(torch.matmul(y_v, x_v), 0, 1)
         assert torch.all(pos_co_activation >= 0) and torch.all(pos_co_activation <= 1), "pos_co_activation not in [0,1]"
-        neg_co_activation = torch.matmul(y_v, 1 - x_v) + torch.matmul(1 - y_v, x_v)
+
+        neg_co_activation = (torch.clip(torch.matmul(y_v, torch.where(x_v==0, 1., 0.)), 0, 1)
+                             + torch.clip(torch.matmul(1 - y_v, x_v), 0, 1))
         assert torch.all(neg_co_activation >= 0.) and torch.all(
             neg_co_activation <= 1), "neg_co_activation not in [0,1]"
         assert not torch.any(

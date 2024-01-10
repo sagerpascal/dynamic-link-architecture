@@ -1,26 +1,25 @@
 import json
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-JSON_FP = Path(".").absolute().parent / "tmp" / "experiment_results.json"
-
 
 def replace_square_list(sl):
-    if sl == [1.2, 1.4, 1.6, 1.8, 2.0, 2.2]:
-        return "1.2 + 0.2t"
-    elif sl == [0.7, 0.9, 1.1, 1.3, 1.5, 1.7]:
-        return "0.7 + 0.2t"
-    elif sl == [2.0, 2.1, 2.2, 2.3, 2.4, 2.5]:
-        return "2.0 + 0.1t"
-    else:
-        raise AttributeError()
+    base_value = sl[0]
+    delta = round(sl[1] - sl[0], 5)
+
+    # check if list is linear
+    for i in range(1, len(sl)):
+        assert sl[i] == base_value + i * delta, "List is not linear"
+
+    return "{} + {}t".format(base_value, delta)
 
 
-def get_data():
+def get_data(file_path):
     results = []
-    with open(str(JSON_FP.absolute())) as f:
+    with open(str(file_path.absolute())) as f:
         filecontents = f.readlines()
         for entry in filecontents:
             data = json.loads(entry)
@@ -41,13 +40,13 @@ def get_data():
 
 def feature_noise_to_location_noise(feature_noise, round_=False):
     # calculate probability of noise at each spatial location (can occur at each of the 4 feature channels)
-    result = 1 - (1-feature_noise)**4
+    result = 1 - (1 - feature_noise) ** 4
     if round_:
         result = np.round(result, 2)
     return result
 
-def plot_line(data, x_key, x_label, y_key, y_label, z_key, z_label, plot_key, plot_label, x2_func=None, x2_label=None):
 
+def plot_line(data, x_key, x_label, y_key, y_label, z_key, z_label, plot_key, plot_label, x2_func=None, x2_label=None):
     fig, axs = plt.subplots(ncols=len(data[plot_key].unique()), figsize=(18, 6), dpi=100)
 
     for ax, pk in zip(axs, data[plot_key].unique()):
@@ -77,7 +76,6 @@ def plot_line(data, x_key, x_label, y_key, y_label, z_key, z_label, plot_key, pl
     plt.show()
 
 
-
 def plot(data):
     # cleanup data
     data.loc[data.noise == 0, 'noise_reduction'] = 1.0
@@ -93,7 +91,7 @@ def plot(data):
               x2_func=feature_noise_to_location_noise, x2_label="Spatial Noise")
 
     plot_line(data_1, x_key="noise", x_label="Feature Noise", y_key="recon_precision", y_label="Precision",
-               z_key='act_threshold', z_label='Act. Threshold', plot_key='square_factor', plot_label='Square Factor',
+              z_key='act_threshold', z_label='Act. Threshold', plot_key='square_factor', plot_label='Square Factor',
               x2_func=feature_noise_to_location_noise, x2_label="Spatial Noise")
 
     # plot line interrupt only
@@ -108,5 +106,7 @@ def plot(data):
 
 
 if __name__ == '__main__':
-    data = get_data()
-    plot(data)
+    for f in ['train_v1', 'train_v2', 'train_v3', 'train_v4', 'train_v5']:
+        file_path = Path(".").absolute().parent / "tmp" / f"{f}_experiment_results.json"
+        data = get_data(file_path)
+        plot(data)

@@ -16,7 +16,14 @@ def _warn_different_configs(config: Dict[str, Optional[Any]], config_old: Dict[s
     diff = DeepDiff(config_old, config)
     keys_ignored = ["store_state_path", "load_state_path", "current_epoch", "n_epochs",
                     "['logging']['wandb']['active']", "'logging:wandb:active'", "['run']['plots']['enable']",
-                    "'run:plots:enable'"]
+                    "'run:plots:enable'", "root['n_samples']", "root['noise']", "root['line_interrupt']",
+                    "root['fps']", "root['store_baseline_activations_path']", "root['cli_args']['n_samples']",
+                    "root['cli_args']['noise']", "root['cli_args']['line_interrupt']", "root['cli_args']['fps']",
+                    "root['cli_args']['store_baseline_activations_path']", "root['logging']['wandb']['job_type']",
+                    "root['cli_args']['logging:wandb:job_type']", "root['load_baseline_activations_path']",
+                    "root['cli_args']['load_baseline_activations_path']",
+                    "root['cli_args']['lateral_model:s2_params:act_threshold']",
+                    "root['cli_args']['lateral_model:s2_params:square_factor']"]
     removed_items = [r for r in list(diff.get("dictionary_item_removed", [])) if
                      not bool([k for k in keys_ignored if k in r])]
     added_items = [a for a in list(diff.get("dictionary_item_added", [])) if
@@ -41,7 +48,7 @@ def merge_configs(
     :param config_old: Old configuration
     :return: Configuration dict
     """
-    _warn_different_configs(config, config_old)
+    #_warn_different_configs(config, config_old)
     config['run']['current_epoch'] = config_old['run']['current_epoch']
     return config
 

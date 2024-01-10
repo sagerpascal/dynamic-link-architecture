@@ -8,18 +8,19 @@ import lightning.pytorch as pl
 import matplotlib
 import numpy as np
 import torch
+import torch.nn.functional as F
+import wandb
 from PIL import Image, ImageDraw, ImageFont
 from lightning import Fabric
 from torch import Tensor
 from tqdm import tqdm
-import torch.nn.functional as F
 
 from data.straight_line import StraightLine
+from main_training import configure, setup_fabric, setup_feature_extractor, setup_lateral_network, setup_wandb
 from models.s2_fragments import LateralNetwork
-from main_training import configure, setup_fabric, setup_feature_extractor, setup_lateral_network
+from utils.custom_print import print_start
 from utils.meters import AverageMeter
 from utils.store_load_run import load_run
-from utils.custom_print import print_start
 
 
 def parse_args(parser: Optional[argparse.ArgumentParser] = None) -> argparse.ArgumentParser:
@@ -65,6 +66,22 @@ def parse_args(parser: Optional[argparse.ArgumentParser] = None) -> argparse.Arg
                         default=None,
                         help="Load baseline activations to compare models to."
                         )
+    parser.add_argument("--wandb_type",
+                        type=str,
+                        default="eval",
+                        dest='logging:wandb:job_type',
+                        )
+    parser.add_argument("--act_threshold",
+                        default="bernoulli",
+                        dest='lateral_model:s2_params:act_threshold',
+                        )
+    parser.add_argument("--square_factor",
+                        type=float,
+                        nargs='+',
+                        default=[1.0, 1.2, 1.4, 1.6, 1.8, 2.0],
+                        dest='lateral_model:s2_params:square_factor',
+                        )
+
     return parser
 
 
@@ -195,11 +212,14 @@ class CustomImage:
         font = ImageFont.truetype("../fonts/calibrib.ttf", font_size)
         font_foot = ImageFont.truetype("../fonts/calibri_italic.ttf", int(font_size * 0.8))
         draw = ImageDraw.Draw(output)
-        draw.text((outer_padding, outer_padding), "Net Fragments as the Brain’s Neural Code to Prevent Early Commitment", (0, 100, 166), font=font_title)
+        draw.text((outer_padding, outer_padding),
+                  "Net Fragments: From Theory to Implementation", (0, 100, 166),
+                  font=font_title)
         draw.text((self.w1, self.h_center - font_size_padded), "Input Image", (40, 40, 40), font=font)
         draw.text((self.w2, self.h_center - font_size_padded), "Feature Activation (S1)", (40, 40, 40), font=font)
         draw.text((self.w3, self.h_center - font_size_padded), "Net Fragments (S2)", (40, 40, 40), font=font)
-        draw.text((self.w4, self.h_center - font_size_padded), "Net Fragments (S2) Probabilities", (40, 40, 40), font=font)
+        draw.text((self.w4, self.h_center - font_size_padded), "Net Fragments (S2) Probabilities", (40, 40, 40),
+                  font=font)
 
         draw.text((20 + 60 + 10, self.height - 20 - font_size_padded), "Sager et al.", (128, 128, 128),
                   font=font_foot)
@@ -230,9 +250,11 @@ class CustomImage:
         :return: The image of the network state as a numpy array
         """
         assert 0. <= img.min() and img.max() <= 1., "img must be in [0, 1]"
-        assert 0. <= s1_in_features.min() and s1_in_features.max() <= 1., "in_features must be in [0, 1]"
+        # assert 0. <= s1_in_features.min() and s1_in_features.max() <= 1., "in_features must be in [0, 1]"
         assert 0. <= s2_act.min() and s2_act.max() <= 1., "s2_act must be in [0, 1]"
         assert 0. <= s2_act_prob.min() and s2_act_prob.max() <= 1., "s2_act_prob must be in [0, 1]"
+
+        s1_in_features = torch.where(s1_in_features > 0., 1., 0.)
 
         img = Image.fromarray((img * 255).squeeze().cpu().numpy().astype("uint8")).convert("RGB")
         s1_in_features = Image.fromarray(self.to_mask((s1_in_features * 255).squeeze().cpu().numpy()))
@@ -265,11 +287,10 @@ def get_data_generator(config: Dict[str, Any]) -> Tuple[torch.Tensor, torch.Tens
     """
 
     points = get_datapoints(config['n_samples'])
-    dataset = StraightLine(split="train", num_images=len(points), num_aug_versions=0)
+    dataset = StraightLine(num_images=len(points))
     for i in range(len(points)):
         img, meta = dataset.get_item(i, line_coords=points[i], n_black_pixels=config['line_interrupt'])
         yield img, meta
-
 
 
 def merge_alt_channels(config: Dict[str, Optional[Any]], lateral_features: List[Tensor]) -> List[Tensor]:
@@ -309,7 +330,8 @@ def analyze_noise(noise: Tensor, random_mask: Tensor, lateral_features: List[Ten
     return removed_noise_ratio.item()
 
 
-def analyze_recon_error(lateral_features: List[Tensor], baseline_lateral_features: List[Tensor]) -> Tuple[float, float, float]:
+def analyze_recon_error(lateral_features: List[Tensor], baseline_lateral_features: List[Tensor]) -> Tuple[
+    float, float, float]:
     """
     Analyzes the reconstruction error of the lateral features.
 
@@ -320,12 +342,17 @@ def analyze_recon_error(lateral_features: List[Tensor], baseline_lateral_feature
     lateral_features = lateral_features[-1].view(-1)
     baseline_lateral_features = baseline_lateral_features[-1].view(-1)
     accuracy = 1. - F.l1_loss(lateral_features, baseline_lateral_features)
-    recall = 1. - F.l1_loss(lateral_features[baseline_lateral_features > 0.], baseline_lateral_features[baseline_lateral_features > 0.])
-    precision = 1. - F.l1_loss(lateral_features[lateral_features > 0.], baseline_lateral_features[lateral_features > 0.])
+    recall = 1. - F.l1_loss(lateral_features[baseline_lateral_features > 0.],
+                            baseline_lateral_features[baseline_lateral_features > 0.])
+    precision = 1. - F.l1_loss(lateral_features[lateral_features > 0.],
+                               baseline_lateral_features[lateral_features > 0.])
     return accuracy.item(), recall.item(), precision.item()
 
 
-def analyze_interrupt_line(img: Tensor, baseline_img: Tensor, lateral_features: List[Tensor], baseline_lateral_features: List[Tensor]) -> float:
+def analyze_interrupt_line(img: Tensor,
+                           baseline_img: Tensor,
+                           lateral_features: List[Tensor],
+                           baseline_lateral_features: List[Tensor]) -> float:
     """
     Analyzes the reconstruction error of the lateral features.
     :param img: The input image
@@ -344,11 +371,11 @@ def analyze_interrupt_line(img: Tensor, baseline_img: Tensor, lateral_features: 
     else:
         accuracy = torch.tensor(0.)
     # mask = torch.where(img != baseline_img, True, False)
-    # baseline_lateral_features_masked = torch.clip(torch.sum(baseline_lateral_features[-1].squeeze(0), dim=0)[mask], max=1)
+    # baseline_lateral_features_masked = torch.clip(torch.sum(baseline_lateral_features[-1].squeeze(0), dim=0)[mask],
+    # max=1)
     # lateral_features_masked = torch.clip(torch.sum(lateral_features[-1].squeeze(0), dim=0)[mask], max=1)
     # accuracy = 1. - F.l1_loss(lateral_features_masked, baseline_lateral_features_masked)
     return accuracy.item()
-
 
 
 def predict_sample(
@@ -373,13 +400,12 @@ def predict_sample(
 
     with torch.no_grad():
         batch = batch[0].to(fabric.device)
-        features = feature_extractor(batch.unsqueeze(0))
-        features = feature_extractor.binarize_features(features).squeeze(1)
+        features = feature_extractor(batch.unsqueeze(0)).squeeze(1)
 
         if config['noise'] > 0.:
             features_s = features.shape
             num_elements = features.numel()
-            num_flips = int(config['noise']  * num_elements)
+            num_flips = int(config['noise'] * num_elements)
             random_mask = torch.randperm(num_elements)[:num_flips]
             random_mask = torch.zeros(num_elements, dtype=torch.bool).scatter(0, random_mask, 1)
             features = features.view(-1)
@@ -387,7 +413,6 @@ def predict_sample(
             features[random_mask] = noise
             features = features.view(features_s)
 
-        lateral_network.new_sample()
         z = torch.zeros((features.shape[0], lateral_network.model.out_channels, features.shape[2],
                          features.shape[3]), device=batch.device)
 
@@ -431,18 +456,22 @@ def process_data(
     :param feature_extractor: Feature extractor
     :param lateral_network: Lateral network (S2)
     """
+    logs = {}
     imgs_, s2_acts = [], []
     ci = CustomImage()
     avg_noise_meter = AverageMeter()
     avg_line_recon_accuracy_meter = AverageMeter()
-    avg_recon_accuracy_meter, avg_recon_recall_meter, avg_recon_precision_meter = AverageMeter(), AverageMeter(), AverageMeter()
-    fp = f"../tmp/v3/{config['config']}_{'noise:'+str(config['noise']) if config['noise'] > 0 else 'no-noise'}_li-{config['line_interrupt']}.mp4"
+    avg_recon_accuracy_meter, avg_recon_recall_meter, avg_recon_precision_meter = (AverageMeter(), AverageMeter(),
+                                                                                   AverageMeter())
+    fp = (f"../tmp/{config['config']}_th-{str(config['lateral_model']['s2_params']['act_threshold'])}_sf-{config['lateral_model']['s2_params']['square_factor'][0]}-{config['lateral_model']['s2_params']['square_factor'][-1]}_{'noise-' + str(config['noise']) if config['noise'] > 0 else 'no-noise'}_li-"
+          f"{config['line_interrupt']}.mp4")
     if Path(fp).exists():
         Path(fp).unlink()
     out = cv2.VideoWriter(fp, cv2.VideoWriter_fourcc(*'mp4v'), config['fps'],
                           (ci.width, ci.height))
     for i, img in tqdm(enumerate(generator), total=config["n_samples"]):
-        inp, s1_inp_features, s2_act, s2_act_prob, removed_noise, interrupt_line_recon, recon_error = predict_sample(config, fabric, feature_extractor, lateral_network, img, i)
+        inp, s1_inp_features, s2_act, s2_act_prob, removed_noise, interrupt_line_recon, recon_error = predict_sample(
+            config, fabric, feature_extractor, lateral_network, img, i)
         s2_act_prob = torch.where((s2_act > 0.) | (s1_inp_features > 0.), s2_act_prob, torch.zeros_like(s2_act_prob))
         s2_acts.append(s2_act)
         imgs_.append(inp)
@@ -453,13 +482,15 @@ def process_data(
         avg_recon_precision_meter(recon_error[2])
 
         for timestep in range(s2_act.shape[0]):
-            result = ci.create_image(inp[timestep], s1_inp_features[timestep, 0], s2_act[timestep, 0], s2_act_prob[timestep, 0])
+            result = ci.create_image(inp[timestep], s1_inp_features[timestep, 0], s2_act[timestep, 0],
+                                     s2_act_prob[timestep, 0])
             out.write(cv2.cvtColor(result, cv2.COLOR_RGB2BGR))
     out.release()
+    logs['act_video'] = wandb.Video(fp, fps=config['fps'], format="mp4")
+
     s2_acts = torch.stack(s2_acts)
     if 'store_baseline_activations_path' in config and config['store_baseline_activations_path'] is not None:
         torch.save([s2_acts, torch.stack(imgs_)], config['store_baseline_activations_path'])
-    # print("Video stored at", fp)
 
     calc_overlap = True
     if calc_overlap:
@@ -489,23 +520,48 @@ def process_data(
         print(f"Average overlap: {torch.mean(overlaps)}")
         print(f"Average biggest overlap: {torch.mean(torch.tensor(boverlaps))}")
 
+        logs['avg_activate_cells'] = avg_activate_cells
+        logs['avg_inactivate_cells'] = avg_inactivate_cells
+        logs['avg_overlap'] = torch.mean(overlaps)
+        logs['avg_biggest_overlap'] = torch.mean(torch.tensor(boverlaps))
+
     print(f"Average Noise Reduction: {avg_noise_meter.mean}")
     print(f"Average Interrupt Line Reconstruction Accuracy: {avg_line_recon_accuracy_meter.mean}")
     print(f"Average Reconstruction Accuracy: {avg_recon_accuracy_meter.mean}")
     print(f"Average Reconstruction Recall: {avg_recon_recall_meter.mean}")
     print(f"Average Reconstruction Precision: {avg_recon_precision_meter.mean}")
-    return avg_noise_meter.mean, avg_line_recon_accuracy_meter.mean, avg_recon_accuracy_meter.mean, avg_recon_recall_meter.mean, avg_recon_precision_meter.mean
 
-def store_noise_results(noise_reduction: float, avg_line_recon_accuracy_meter:float, recon_accuracy: float, recon_recall: float, recon_precision: float, config: Dict[str, Any]):
+    logs['avg_noise_reduction'] = avg_noise_meter.mean
+    logs['avg_line_recon_accuracy'] = avg_line_recon_accuracy_meter.mean
+    logs['avg_recon_accuracy'] = avg_recon_accuracy_meter.mean
+    logs['avg_recon_recall'] = avg_recon_recall_meter.mean
+    logs['avg_recon_precision'] = avg_recon_precision_meter.mean
+
+    return (avg_noise_meter.mean, avg_line_recon_accuracy_meter.mean, avg_recon_accuracy_meter.mean,
+            avg_recon_recall_meter.mean, avg_recon_precision_meter.mean, logs)
+
+
+def store_experiment_results(noise_reduction: float,
+                             avg_line_recon_accuracy_meter: float,
+                             recon_accuracy: float,
+                             recon_recall: float,
+                             recon_precision: float,
+                             config: Dict[str, Any]):
     """
     Stores the noise reduction results in a csv file
-    :param noise_reduction: The noise reduction
-    :param recon_error: The reconstruction error
+    :param noise_reduction: Noise reduction
+    :param avg_line_recon_accuracy_meter: Line reconstruction accuracy
+    :param recon_accuracy: Reconstruction accuracy
+    :param recon_recall: Reconstruction recall
+    :param recon_precision: Reconstruction precision
     :param config: Configuration
     """
-    fp = f"../tmp/noise_reduction.json"
+    fp = f"../tmp/{config['config']}_experiment_results.json"
     with open(fp, "a") as f:
-        json.dump({'config': config, 'noise_reduction': noise_reduction, 'avg_line_recon_accuracy_meter':avg_line_recon_accuracy_meter, 'recon_accuracy': recon_accuracy, 'recon_recall': recon_recall, 'recon_precision': recon_precision}, f)
+        json.dump({'config': config, 'noise_reduction': noise_reduction,
+                   'avg_line_recon_accuracy_meter': avg_line_recon_accuracy_meter, 'recon_accuracy': recon_accuracy,
+                   'recon_recall': recon_recall, 'recon_precision': recon_precision}, f)
+        f.write("\n")
 
 
 def main():
@@ -515,10 +571,18 @@ def main():
     print_start("Starting python script 'main_evaluation.py'...",
                 title="Evaluating Model and Print activations")
     config, fabric, feature_extractor, lateral_network = load_models()
+    setup_wandb(config)
     generator = get_data_generator(config)
-    noise_reduction, avg_line_recon_accuracy_meter, recon_accuracy, recon_recall, recon_precision = process_data(generator, config, fabric, feature_extractor, lateral_network)
+    noise_reduction, avg_line_recon_accuracy_meter, recon_accuracy, recon_recall, recon_precision, logs = process_data(
+        generator, config, fabric, feature_extractor, lateral_network)
     if 'store_baseline_activations_path' not in config or config['store_baseline_activations_path'] is None:
-        store_noise_results(noise_reduction, avg_line_recon_accuracy_meter, recon_accuracy, recon_recall, recon_precision, config)
+        store_experiment_results(noise_reduction, avg_line_recon_accuracy_meter, recon_accuracy, recon_recall,
+                                 recon_precision, config)
+
+    if "wandb" in config['logging'].keys() and config['logging']['wandb']['active']:
+        wandb.log(logs)
+        wandb.finish()
+
 
 if __name__ == "__main__":
     main()

@@ -18,58 +18,91 @@ class Conv2dFixedFilters(nn.Module):
     Fixed 2D convolutional layer with 4 filters that detect straight lines.
     """
 
-    def __init__(self, fabric: Fabric):
+    def __init__(self, fabric: Fabric, use_larger_weights: Optional[bool] = False, threshold_f: Optional[str] = "None"):
         """
         Constructor.
         :param fabric: A Fabric instance.
+        :param use_larger_weights: Whether to use larger weights that sum up to 3 instead of 1.
+        :param threshold_f: Threshold function to use. Can be "None", "threshold" or "bernoulli".
         """
         super(Conv2dFixedFilters, self).__init__()
-        self.weight = torch.tensor([
-            [[[+0.00, -0.50, +0.00, -0.50, +0.00],
-              [+0.00, -0.50, +1.00, -0.50, +0.00],
-              [+0.00, -0.50, +1.00, -0.50, +0.00],
-              [+0.00, -0.50, +1.00, -0.50, +0.00],
-              [+0.00, -0.50, +0.00, -0.50, +0.00]]],
-            [[[+0.00, +0.00, -0.50, -0.50, +0.00],
-              [+0.00, -0.50, +0.00, +1.00, -0.50],
-              [-0.50, +0.00, +1.00, +0.00, -0.50],
-              [-0.50, +1.00, +0.00, -0.50, +0.00],
-              [+0.00, -0.50, -0.50, +0.00, +0.00]]],
-            [[[+0.00, +0.00, +0.00, +0.00, +0.00],
-              [-0.50, -0.50, -0.50, -0.50, -0.50],
-              [+0.00, +1.00, +1.00, +1.00, +0.00],
-              [-0.50, -0.50, -0.50, -0.50, -0.50],
-              [+0.00, +0.00, +0.00, +0.00, +0.00]]],
-            [[[+0.00, -0.50, -0.50, +0.00, +0.00],
-              [-0.50, +1.00, +0.00, -0.50, +0.00],
-              [-0.50, +0.00, +1.00, +0.00, -0.50],
-              [+0.00, -0.50, +0.00, +1.00, -0.50],
-              [+0.00, +0.00, -0.50, -0.50, +0.00]]]
-        ], dtype=torch.float32, requires_grad=False).to(fabric.device)
+        self.threshold_f = threshold_f
 
-        self.weight = torch.tensor([[[[+0, -1, +0, -1, +0],
-                                      [+0, -1, +2, -1, +0],
-                                      [+0, -1, +2, -1, +0],
-                                      [+0, -1, +2, -1, +0],
-                                      [+0, -1, +0, -1, +0]]],
-                                    [[[+0, +0, -1, -1, +0],
-                                      [+0, -1, +0, +2, -1],
-                                      [-1, +0, +2, +0, -1],
-                                      [-1, +2, +0, -1, +0],
-                                      [+0, -1, -1, +0, +0]]],
-                                    [[[+0, +0, +0, +0, +0],
-                                      [-1, -1, -1, -1, -1],
-                                      [+0, +2, +2, +2, +0],
-                                      [-1, -1, -1, -1, -1],
-                                      [+0, +0, +0, +0, +0]]],
-                                    [[[+0, -1, -1, +0, +0],
-                                      [-1, +2, +0, -1, +0],
-                                      [-1, +0, +2, +0, -1],
-                                      [+0, -1, +0, +2, -1],
-                                      [+0, +0, -1, -1, +0]]],
-                                    # Filter could be further improved by setting 4x +0 in the middle to -1
-                                    ], dtype=torch.float32, requires_grad=False).to(fabric.device)
-        self.weight = self.weight / 6
+        if use_larger_weights:
+            # These kernels can sum up to 3.0 (with the proper 3 cells being active)
+            self.weight = torch.tensor([
+                [[[+0.0, -0.5, +0.0, -0.5, +0.0],
+                  [+0.0, -0.5, +1.0, -0.5, +0.0],
+                  [+0.0, -0.5, +1.0, -0.5, +0.0],
+                  [+0.0, -0.5, +1.0, -0.5, +0.0],
+                  [+0.0, -0.5, +0.0, -0.5, +0.0]]],
+                [[[+0.0, +0.0, -0.5, -0.5, +0.0],
+                  [+0.0, -0.5, +0.0, +1.0, -0.5],
+                  [-0.5, +0.0, +1.0, +0.0, -0.5],
+                  [-0.5, +1.0, +0.0, -0.5, +0.0],
+                  [+0.0, -0.5, -0.5, +0.0, +0.0]]],
+                [[[+0.0, +0.0, +0.0, +0.0, +0.0],
+                  [-0.5, -0.5, -0.5, -0.5, -0.5],
+                  [+0.0, +1.0, +1.0, +1.0, +0.0],
+                  [-0.5, -0.5, -0.5, -0.5, -0.5],
+                  [+0.0, +0.0, +0.0, +0.0, +0.0]]],
+                [[[+0.0, -0.5, -0.5, +0.0, +0.0],
+                  [-0.5, +1.0, +0.0, -0.5, +0.0],
+                  [-0.5, +0.0, +1.0, +0.0, -0.5],
+                  [+0.0, -0.5, +0.0, +1.0, -0.5],
+                  [+0.0, +0.0, -0.5, -0.5, +0.0]]]
+                # Filter could be further improved by setting 4x +0 in the middle to -0.5
+            ], dtype=torch.float32, requires_grad=False).to(fabric.device)
+
+            self.weight = torch.tensor([
+                [[[-0.5, -0.5, +0.0, -0.5, -0.5],
+                  [+0.0, -0.5, +1.0, -0.5, +0.0],
+                  [-0.5, -0.5, +2.0, -0.5, -0.5],
+                  [+0.0, -0.5, +1.0, -0.5, +0.0],
+                  [-0.5, -0.5, +0.0, -0.5, -0.5]]],
+                [[[-0.5, +0.0, -0.5, -0.5, +0.0],
+                  [+0.0, -0.5, -0.5, +1.0, -0.5],
+                  [-0.5, -0.5, +2.0, -0.5, -0.5],
+                  [-0.5, +1.0, -0.5, -0.5, +0.0],
+                  [+0.0, -0.5, -0.5, +0.0, -0.5]]],
+                [[[-0.5, +0.0, -0.5, +0.0, -0.5],
+                  [-0.5, -0.5, -0.5, -0.5, -0.5],
+                  [+0.0, +1.0, +2.0, +1.0, +0.0],
+                  [-0.5, -0.5, -0.5, -0.5, -0.5],
+                  [-0.5, +0.0, -0.5, +0.0, -0.5]]],
+                [[[+0.0, -0.5, -0.5, +0.0, -0.5],
+                  [-0.5, +1.0, -0.5, -0.5, +0.0],
+                  [-0.5, -0.5, +2.0, -0.5, -0.5],
+                  [+0.0, -0.5, -0.5, +1.0, -0.5],
+                  [-0.5, +0.0, -0.5, -0.5, +0.0]]]
+                # Filter could be further improved by setting 4x +0 in the middle to -0.5
+            ], dtype=torch.float32, requires_grad=False).to(fabric.device)
+
+        else:
+            # These kernels can sum up to 1.0 (with the proper 3 cells being active)
+            self.weight = torch.tensor([[[[+0, -1, +0, -1, +0],
+                                          [+0, -1, +2, -1, +0],
+                                          [+0, -1, +2, -1, +0],
+                                          [+0, -1, +2, -1, +0],
+                                          [+0, -1, +0, -1, +0]]],
+                                        [[[+0, +0, -1, -1, +0],
+                                          [+0, -1, +0, +2, -1],
+                                          [-1, +0, +2, +0, -1],
+                                          [-1, +2, +0, -1, +0],
+                                          [+0, -1, -1, +0, +0]]],
+                                        [[[+0, +0, +0, +0, +0],
+                                          [-1, -1, -1, -1, -1],
+                                          [+0, +2, +2, +2, +0],
+                                          [-1, -1, -1, -1, -1],
+                                          [+0, +0, +0, +0, +0]]],
+                                        [[[+0, -1, -1, +0, +0],
+                                          [-1, +2, +0, -1, +0],
+                                          [-1, +0, +2, +0, -1],
+                                          [+0, -1, +0, +2, -1],
+                                          [+0, +0, -1, -1, +0]]],
+                                        # Filter could be further improved by setting 4x +0 in the middle to -1
+                                        ], dtype=torch.float32, requires_grad=False).to(fabric.device)
+            self.weight = self.weight / 6
 
     def apply_conv(self, x: Tensor) -> Tensor:
         """
@@ -79,6 +112,20 @@ class Conv2dFixedFilters(nn.Module):
         """
         x = F.conv2d(x, self.weight, padding="same")
         return x
+
+    def apply_activation(self, a: Tensor) -> Tensor:
+        """
+        Apply activation function to the features.
+        :param a: Features
+        :return: Activated features
+        """
+
+        if self.threshold_f == "None":
+            return torch.where(a > 0, a, 0.)
+        elif self.threshold_f == "threshold":
+            return torch.where(a > 0, 1., 0.)
+        elif self.threshold_f == "bernoulli":
+            return torch.bernoulli(torch.clip(a, 0, 1))
 
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -93,7 +140,7 @@ class Conv2dFixedFilters(nn.Module):
             a = torch.stack(result, dim=1)
         else:
             a = self.apply_conv(x).unsqueeze(1)
-        return a
+        return self.apply_activation(a)
 
 
 class FixedFilterFeatureExtractor(pl.LightningModule):
@@ -110,7 +157,6 @@ class FixedFilterFeatureExtractor(pl.LightningModule):
         super().__init__()
         self.conf = conf
         self.fabric = fabric
-        self.bin_threshold = conf["feature_extractor"]["bin_threshold"]
         self.model = self.configure_model()
 
     def forward(self, x: Tensor) -> Tensor:
@@ -121,20 +167,12 @@ class FixedFilterFeatureExtractor(pl.LightningModule):
         """
         return self.model(x)
 
-    def binarize_features(self, x: Tensor) -> Tensor:
-        """
-        Convert float tensor to binary tensor
-        :param x: Features as float
-        :return: Binarized Features
-        """
-        return torch.bernoulli(torch.clip(x, 0, 1))
-
     def configure_model(self) -> nn.Module:
         """
            Configures the model.
            :return: The model.
            """
-        return Conv2dFixedFilters(self.fabric)
+        return Conv2dFixedFilters(self.fabric, **self.conf['feature_extractor']['s1_params'])
 
     def plot_model_weights(self, show_plot: Optional[bool] = False) -> List[Path]:
         """
@@ -158,8 +196,9 @@ class FixedFilterFeatureExtractor(pl.LightningModule):
             # Order is [(0, 0), (1, 0), ..., (3, 0), (0, 1), ..., (3, 7)]
             # The columns show the output channels, the rows the input channels
             grid = utils.make_grid(weight_img_list, nrow=weight.shape[0], normalize=True, scale_each=True, pad_value=1)
-            #grid = grid / 2 - 1/6  # Normalize to [-1/6, 1/3]
-            im = ax.imshow(grid[:, 2:-2, 2:-2].permute(1, 2, 0), interpolation='none', cmap="gray")#, vmin=-1/6, vmax=1/3)
+            # grid = grid / 2 - 1/6  # Normalize to [-1/6, 1/3]
+            im = ax.imshow(grid[:, 2:-2, 2:-2].permute(1, 2, 0), interpolation='none',
+                           cmap="gray")  # , vmin=-1/6, vmax=1/3)
             divider = make_axes_locatable(ax)
             cax = divider.append_axes('right', size='5%', pad=0.05)
             fig.colorbar(im, cax=cax, orientation='vertical')

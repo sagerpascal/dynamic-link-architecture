@@ -12,7 +12,7 @@ dataset:
     num_images: 60
 
 run:
-  n_epochs: 50
+  n_epochs: 100
   current_epoch: 0
   plots:
     enable: True
@@ -27,7 +27,7 @@ logging:
     save_dir: "../wandb"
     project: "net-fragments"
     log_model: True
-    group: v1
+    group: base
     job_type: train
   console:
     active: True
@@ -42,12 +42,12 @@ feature_extractor:
 
 lateral_model:
   channels: 4
-  max_timesteps: 2  # 1 = only one forward pass without recurrent connection
+  max_timesteps: 5  # 1 = only one forward pass without recurrent connection
   s2_params:
     locality_size: 5
     lr: 0.2
     neg_corr: True
-    act_threshold: 0.5  # 'bernoulli'
+    act_threshold: 0.5
     square_factor:
       - 1.2
       - 1.4

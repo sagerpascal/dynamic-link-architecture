@@ -27,7 +27,7 @@ logging:
     save_dir: "../wandb"
     project: "net-fragments"
     log_model: True
-    group: v1
+    group: v5
     job_type: train
   console:
     active: True
@@ -37,22 +37,22 @@ n_alternative_cells: 10
 feature_extractor:
   out_channels: 4
   s1_params:
-    use_larger_weights: False
-    threshold_f: 'threshold'
+    use_larger_weights: True
+    threshold_f: 'None'
 
 lateral_model:
   channels: 4
-  max_timesteps: 2  # 1 = only one forward pass without recurrent connection
+  max_timesteps: 6  # 1 = only one forward pass without recurrent connection
   s2_params:
     locality_size: 5
     lr: 0.2
     neg_corr: True
-    act_threshold: 0.5  # 'bernoulli'
+    act_threshold: 'bernoulli'
     square_factor:
+      - 1.0
       - 1.2
       - 1.4
       - 1.6
       - 1.8
       - 2.0
-      - 2.2
     support_factor: 1.3
