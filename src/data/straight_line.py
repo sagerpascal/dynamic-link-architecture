@@ -15,7 +15,6 @@ class StraightLine(Dataset):
                  img_h: Optional[int] = 32,
                  img_w: Optional[int] = 32,
                  num_images: Optional[int] = 50,
-                 noise: Optional[float] = 0.,
                  n_black_pixels: Optional[int] = 1,
                  transform: Optional[Callable] = None):
         """
@@ -23,12 +22,10 @@ class StraightLine(Dataset):
         :param img_h: Height of the images.
         :param img_w: Width of the images.
         :param num_images: Number of images to generate.
-        :param noise: The amount of noise to add to the image (i.e. probability to set some pixels to 1).
         :param n_black_pixels: The number of black pixels to add to the image.
         :param transform: Optional transform to be applied on a sample.
         """
         super().__init__()
-        assert 0 <= noise <= 1, "noise must be between 0 and 1"
 
         self.img_h = img_h
         self.img_w = img_w
@@ -86,7 +83,6 @@ class StraightLine(Dataset):
         Creates either a RBG or a grayscale image with a random straight line in withe drawn on it.
         :param idx: The index of the image.
         :param line_coords: The coordinates of the line to draw.
-        :param noise: The noise to add to the image.
         :param n_black_pixels: The number of black pixels to add to the middle of the line.
         :return: The image.
         """
@@ -137,33 +133,3 @@ class StraightLine(Dataset):
 
     def __getitem__(self, idx: int):
         return self.get_item(idx)
-
-
-def _plot_some_samples():
-    """
-    Plots some samples of the straight line dataset.
-    """
-    import torchvision.transforms as transforms
-    import matplotlib.pyplot as plt
-
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-    ])
-
-    dataset = StraightLine(split="train", num_images=8, num_aug_versions=0, num_channels=1,
-                           transform=transform, vertical_horizontal_only=False, noise=0.00)
-
-    fig, axs = plt.subplots(1, 8, figsize=(16, 2))
-    for i in range(8):
-        img, meta = dataset.get_item(i, n_black_pixels=0)
-        alpha = -round(math.atan((meta['line_coords'][1][1] - meta['line_coords'][0][1]) / (
-                meta['line_coords'][1][0] - meta['line_coords'][0][0])) * 180 / math.pi, 2)
-        axs[i].set_title(f"{alpha:.2f}°")
-        axs[i].imshow(torch.where(img == 1, 0, 1).squeeze(), vmin=0, vmax=1.2, cmap='gray')
-        axs[i].axis('off')
-    plt.tight_layout()
-    plt.show()
-
-
-if __name__ == '__main__':
-    _plot_some_samples()

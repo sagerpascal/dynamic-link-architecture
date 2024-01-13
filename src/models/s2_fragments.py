@@ -77,6 +77,11 @@ class LateralLayer(nn.Module):
         self.square_factor = square_factor
         self.support_factor = support_factor
 
+        try:
+            self.act_threshold = float(self.act_threshold)
+        except ValueError:
+            pass
+
         assert self.act_threshold in ['bernoulli'] or isinstance(self.act_threshold, float), \
             f"act_threshold must be either 'bernoulli' or a float, but is {self.act_threshold}"
 
