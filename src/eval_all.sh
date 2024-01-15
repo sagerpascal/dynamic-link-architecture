@@ -5,7 +5,7 @@ for config in 'net-fragments'; do
 
   for act_threshold in 0.3 0.5 0.7; do
 
-    for square_factor in '0.6 0.8 1.0 1.2 1.4 1.6' '1.0 1.2 1.4 1.6 1.8 2.0' '1.2 1.4 1.6 1.8 2.0 2.2' '1.8 1.9 2.0 2.1 2.2 1.8'; do
+    for square_factor in '0.6 0.8 1.0 1.2 1.4 1.6' '1.2 1.4 1.6 1.8 2.0 2.2' '1.8 1.9 2.0 2.1 2.2 2.3'; do
 
       echo "Store baseline $config..."
       python main_evaluation.py $config --load ../checkpoints/$config.ckpt --noise 0 --line_interrupt 0 --store_baseline_activations_path ../tmp/$config.pt --act_threshold $act_threshold --square_factor $square_factor

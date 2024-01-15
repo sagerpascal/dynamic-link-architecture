@@ -35,7 +35,7 @@ def parse_args(parser: Optional[argparse.ArgumentParser] = None) -> argparse.Arg
     parser.add_argument("--n_samples",
                         type=int,
                         metavar="N",
-                        default=60,
+                        default=59,
                         help="Number of samples to evaluate."
                         )
     parser.add_argument("--noise",
@@ -463,8 +463,12 @@ def process_data(
     avg_line_recon_accuracy_meter = AverageMeter()
     avg_recon_accuracy_meter, avg_recon_recall_meter, avg_recon_precision_meter = (AverageMeter(), AverageMeter(),
                                                                                    AverageMeter())
-    fp = (f"../tmp/{config['config']}_th-{str(config['lateral_model']['s2_params']['act_threshold'])}_sf-{config['lateral_model']['s2_params']['square_factor'][0]}-{config['lateral_model']['s2_params']['square_factor'][-1]}_{'noise-' + str(config['noise']) if config['noise'] > 0 else 'no-noise'}_li-"
+    fp = (f"../tmp/{config['config']}/th-{str(config['lateral_model']['s2_params']['act_threshold'])}_sf-{config['lateral_model']['s2_params']['square_factor'][0]}-{config['lateral_model']['s2_params']['square_factor'][-1]}/{'noise-' + str(config['noise']) if config['noise'] > 0 else 'no-noise'}_li-"
           f"{config['line_interrupt']}.mp4")
+
+    if not Path(fp).parent.exists():
+        Path(fp).parent.mkdir(parents=True)
+
     if Path(fp).exists():
         Path(fp).unlink()
     out = cv2.VideoWriter(fp, cv2.VideoWriter_fourcc(*'mp4v'), config['fps'],
@@ -556,7 +560,7 @@ def store_experiment_results(noise_reduction: float,
     :param recon_precision: Reconstruction precision
     :param config: Configuration
     """
-    fp = f"../tmp/{config['config']}_experiment_results.json"
+    fp = f"../tmp/{config['config']}/experiment_results.json"
     with open(fp, "a") as f:
         json.dump({'config': config, 'noise_reduction': noise_reduction,
                    'avg_line_recon_accuracy_meter': avg_line_recon_accuracy_meter, 'recon_accuracy': recon_accuracy,

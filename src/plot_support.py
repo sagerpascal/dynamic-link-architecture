@@ -9,11 +9,7 @@ LAMBDA = 1.3 * 11
 X_MAX = 18
 
 RUN_PATHS = {
-    "v1": "sagerpascal/net-fragments/r96et2a8",
-    "v2": "sagerpascal/net-fragments/hdufwmod",
-    "v3": "sagerpascal/net-fragments/in0jjsvr",
-    "v4": "sagerpascal/net-fragments/kq5eqcyy",
-    "v5": "sagerpascal/net-fragments/6o1lmivz",
+    "net-fragments": "sagerpascal/net-fragments-final/m8ecvdhb",
 }
 
 
@@ -61,9 +57,12 @@ def print_support_active_cells(title, min_support_active, max_support_active, av
     :param avg_support_active: Avg support active cells
     :param avg_support_inactive: Avg support inactive cells
     """
+
+    # if problems with font, run it on local machine
+    plt.rcParams["font.family"] = "Times New Roman"
     x = np.arange(1, len(avg_support_active) + 1, 1)
 
-    fig, ax = plt.subplots(dpi=100, figsize=(8, 4))
+    fig, ax = plt.subplots(dpi=300, figsize=(8, 4))
     # ax.plot(x, avg_support_active, label="avg. support active cells (without inhibition)")
     # ax.fill_between(x, min_support_active, max_support_active, color='b', alpha=.15,
     #                 label="min/max support (without inhibition)")
@@ -74,12 +73,12 @@ def print_support_active_cells(title, min_support_active, max_support_active, av
 
     ax.plot(x, [LAMBDA] * len(avg_support_active), color='r', linestyle='--', label="λ")
     ax.plot(x, avg_support_inactive, label="avg. support inactive cells", color='orange')
-    plt.title(title)
+    # plt.title(title)
     plt.legend()
     plt.ylabel("Support Strength")
     plt.xlabel("Epoch")
     plt.yticks(np.arange(0, X_MAX + 1, 2), np.arange(0, X_MAX + 1, 2))
-    d = 1 if len(avg_support_active) < 20 else 2
+    d = 2 if len(avg_support_active) <= 50 else 4
     plt.xticks(np.arange(0, len(avg_support_active) + 1, d), np.arange(0, len(avg_support_active) + 1, d))
     plt.xlim(1, len(avg_support_active))
     plt.ylim(0, X_MAX)
