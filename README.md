@@ -31,27 +31,14 @@ pip install -r requirements.txt
 Training can be done as follows:
 
 ```bash
-python main_training.py <config> --wandb --plot --store <store_path>
+python main_training.py net-fragments --wandb --plot --store <store_path>
 ```
 
-where `config` is the name of the training configuration (see below), `store_path` is the path where the results should be stored, and `wandb` and `plot` are optional flags to enable logging to [wandb](https://wandb.ai/) and plotting of the results, respectively.
+where `net-fragments` is the name of the training configuration, `store_path` is the path where the results should be stored, and `wandb` and `plot` are optional flags to enable logging to [wandb](https://wandb.ai/) and plotting of the results, respectively.
 
-A concrete example would be:
+#### Evaluation
 
-```bash
-python main_training.py train_v1 --plot --wandb --store train_v1.ckpt 
-````
-
-
-Training configurations:
-- `train_v1`: S1 activates based on a fixed threshold, S2 uses only 2 timesteps, has slightly higher square factors, and does not use Bernoulli neurons
-- `train_v2`: S1 activates based on a fixed threshold, S2 uses 6 timesteps and does not use Bernoulli neurons
-- `train_v3`: S1 activates based on a fixed threshold, S2 uses 6 timesteps and Bernoulli neurons
-- `train_v4`: S1 uses Bernoulli neurons, S2 uses 6 timesteps and Bernoulli neurons
-- `train_v5`: S1 does not have an activation function (jus clip activations below 0 to 0), S2 uses 6 timesteps and Bernoulli neurons
-
-
-For evaluation, first create store the baseline activations of the trained model:
+For evaluation, first create the baseline activations of the trained model:
 
 
 ```bash
@@ -66,5 +53,5 @@ python main_evaluation.py $config --load <ckpt_path> --noise <noise_float> --lin
 ```
 
 where `noise` is the noise level, `line_interrupt` is the number of interrupted lines, `act_threshold` is the activation threshold, and `square_factor` is the square factor.
-You can also use `--act_threshold bernoulli` to wir with Bernoulli neurons. However, in this case, the results are based
+You can also use `--act_threshold bernoulli` to test with Bernoulli neurons. However, in this case, the results are based
 on randomness and will vary between runs. Therefore, we recommend using a fixed activation threshold, e.g. `--act_threshold 0.5`, which will also makes the plot easier to comprehend.
