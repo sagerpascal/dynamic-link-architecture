@@ -26,7 +26,7 @@ def get_data(file_path):
             result = {
                 'noise': data['config']['noise'],
                 'line_interrupt': data['config']['line_interrupt'],
-                'act_bias': round(float(data['config']['lateral_model']['s2_params']['act_threshold'])-0.5, 2),
+                'act_bias': round(0.5 - float(data['config']['lateral_model']['s2_params']['act_threshold']), 2),
                 'square_factor': replace_square_list(data['config']['lateral_model']['s2_params']['square_factor']),
                 'noise_reduction': data['noise_reduction'],
                 'avg_line_recon_accuracy_meter': data['avg_line_recon_accuracy_meter'],
