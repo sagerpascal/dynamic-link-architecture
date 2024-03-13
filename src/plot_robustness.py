@@ -51,11 +51,13 @@ def plot_line(data, x_key, x_label, y_key, y_label, z_key, z_label, plot_key, pl
               x2_func=None, x2_label=None, set_title=True, filename=None):
 
     # if problems with font, run it on local machine
-    plt.rcParams["font.family"] = "Times New Roman"
+    # plt.rcParams["font.family"] = "Times New Roman"
+    plt.rcParams["font.family"] = "Helvetica"
+    plt.rcParams["font.size"] = 14
 
     fig, axs = plt.subplots(ncols=len(data[plot_key].unique()), figsize=(13, 3), dpi=300)
 
-    for ax, pk in zip(axs, sorted(data[plot_key].unique())):
+    for ic, (ax, pk) in enumerate(zip(axs, sorted(data[plot_key].unique()))):
         data_ = data[data[plot_key] == pk]
 
         z_values = list(data_[z_key].unique())
@@ -66,10 +68,11 @@ def plot_line(data, x_key, x_label, y_key, y_label, z_key, z_label, plot_key, pl
             ax.plot(z[x_key].values, z[y_key].values, label="{}{}".format(z_label, zv))
 
         if set_title:
-            ax.set_title("{} = {}".format(plot_label, pk))
+            ax.set_title("{}{}".format(plot_label, pk))
 
         ax.set_xlabel(x_label)
-        ax.set_ylabel(y_label)
+        if ic == 0:
+            ax.set_ylabel(y_label)
 
         ax.set_ylim(ymax=ymax, ymin=ymin)
         ax.set_xlim(xmin=xmin, xmax=xmax)
@@ -102,17 +105,17 @@ def plot(data, configname):
     # plot noise only
     data_1 = data[data['line_interrupt'] == 0]
     plot_line(data_1, x_key="noise", x_label="Feature Noise", y_key="noise_reduction", y_label="Noise Reduction Rate",
-              z_key='act_bias', z_label='Act. Bias b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
+              z_key='act_bias', z_label='b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
               x2_func=feature_noise_to_location_noise, x2_label="Spatial Noise", filename=fname("1_noise_reduction"),
               xmin=-0.005, xmax=0.205, ymin=0.795, ymax=1.005)
 
     plot_line(data_1, x_key="noise", x_label="Feature Noise", y_key="recon_recall", y_label="Recall",
-              z_key='act_bias', z_label='Act. Bias b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
+              z_key='act_bias', z_label='b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
               x2_func=feature_noise_to_location_noise, x2_label="Spatial Noise", set_title=False,
               filename=fname("2_recon_recall"), xmin=-0.005, xmax=0.205, ymin=0.08, ymax=1.02)
 
     plot_line(data_1, x_key="noise", x_label="Feature Noise", y_key="recon_precision", y_label="Precision",
-              z_key='act_bias', z_label='Act. Bias b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
+              z_key='act_bias', z_label='b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
               x2_func=feature_noise_to_location_noise, x2_label="Spatial Noise", set_title=False,
               filename=fname("3_recon_precision"), xmin=-0.005, xmax=0.205, ymin=0.08, ymax=1.02)
 
@@ -121,14 +124,14 @@ def plot(data, configname):
     # set accuracy to 1 where line is not interrupted for the plot
     data_1.loc[data_1.line_interrupt == 0, 'avg_line_recon_accuracy_meter'] = 1.0
     plot_line(data_1, x_key="line_interrupt", x_label="Line Interrupt", y_key="avg_line_recon_accuracy_meter",
-              y_label="Feature Reconstruction Rate", z_key='act_bias', z_label='Act. Bias b = ',
+              y_label="Feature Reconstruction Rate", z_key='act_bias', z_label='b = ',
               plot_key='square_factor', plot_label='Power Factor γ = ', filename=fname("4_avg_line_recon_accuracy"),
               xmin=-0.1, xmax=7.1, ymin=-0.02, ymax=1.02)
     plot_line(data_1, x_key="line_interrupt", x_label="Line Interrupt", y_key="recon_recall", y_label="Recall",
-              z_key='act_bias', z_label='Act. Bias b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
+              z_key='act_bias', z_label='b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
               set_title=False, filename=fname("5_recon_recall"), xmin=-0.1, xmax=7.1, ymin=0.49, ymax=1.01)
     plot_line(data_1, x_key="line_interrupt", x_label="Line Interrupt", y_key="recon_precision", y_label="Precision",
-              z_key='act_bias', z_label='Act. Bias b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
+              z_key='act_bias', z_label='b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
               set_title=False, filename=fname("6_recon_precision"), xmin=-0.1, xmax=7.1, ymin=0.49, ymax=1.01)
 
 

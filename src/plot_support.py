@@ -5,8 +5,8 @@ import numpy as np
 import wandb
 
 
-LAMBDA = 1.3 * 11
-X_MAX = 18
+LAMBDA = 1.3 * 11 * 10000
+X_MAX = 20
 
 RUN_PATHS = {
     "net-fragments": "sagerpascal/net-fragments-final/m8ecvdhb",
@@ -59,7 +59,8 @@ def print_support_active_cells(title, min_support_active, max_support_active, av
     """
 
     # if problems with font, run it on local machine
-    plt.rcParams["font.family"] = "Times New Roman"
+    # plt.rcParams["font.family"] = "Times New Roman"
+    plt.rcParams["font.family"] = "Helvetica"
     x = np.arange(1, len(avg_support_active) + 1, 1)
 
     fig, ax = plt.subplots(dpi=300, figsize=(8, 4))
@@ -71,7 +72,7 @@ def print_support_active_cells(title, min_support_active, max_support_active, av
     ax.fill_between(x, min_support_active, max_support_active, color='b', alpha=.15,
                     label="min/max support")
 
-    ax.plot(x, [LAMBDA] * len(avg_support_active), color='r', linestyle='--', label="λ")
+    # ax.plot(x, [LAMBDA] * len(avg_support_active), color='r', linestyle='--', label="λ")
     ax.plot(x, avg_support_inactive, label="avg. support inactive cells", color='orange')
     # plt.title(title)
     plt.legend()
