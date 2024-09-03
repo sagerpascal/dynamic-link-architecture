@@ -1,7 +1,7 @@
-# Net Fragments
+# The Dynamic Net Architecture
 
-This repository contains the code of "Biologically Inspired Net Fragments in Machine Learning Systems: From Theory to Implementation".
-Please note that the original code is available at [https://github.com/sagerpascal/lateral-connections](https://github.com/sagerpascal/lateral-connections), containing much more options (including a feedback layer S3 and more datasets).
+This repository contains the code of "The Dynamic Net Architecture: Learning Robust and Holistic Visual Representations Through Self-Organizing Networks."
+Please note that the original code is available at [https://github.com/sagerpascal/lateral-connections](https://github.com/sagerpascal/lateral-connections), containing many more options (including a feedback layer S3 and more datasets).
 However, this repository contains a more recent version of the code, which is more modular and easier to use.
 All results in the paper have been re-created using this code.
 
