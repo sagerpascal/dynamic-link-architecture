@@ -12,7 +12,7 @@ dataset:
     num_images: 60
 
 run:
-  n_epochs: 100
+  n_epochs: 101
   current_epoch: 0
   plots:
     enable: True

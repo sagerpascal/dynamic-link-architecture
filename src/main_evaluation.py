@@ -15,6 +15,7 @@ from lightning import Fabric
 from torch import Tensor
 from tqdm import tqdm
 
+from data.spline_line import SplineLine
 from data.straight_line import StraightLine
 from main_training import configure, setup_fabric, setup_feature_extractor, setup_lateral_network, setup_wandb
 from models.s2_fragments import LateralNetwork
@@ -49,6 +50,11 @@ def parse_args(parser: Optional[argparse.ArgumentParser] = None) -> argparse.Arg
                         metavar="N",
                         default=0,
                         help="Number of pixels to remove from the line."
+                        )
+    parser.add_argument("--line_type",
+                        choices=['straight', 'curved'],
+                        type=str,
+                        default='straight',
                         )
     parser.add_argument("--fps",
                         type=int,
@@ -285,12 +291,21 @@ def get_data_generator(config: Dict[str, Any]) -> Tuple[torch.Tensor, torch.Tens
     :param config: Configuration.
     :return: Data generator.
     """
+    if config['line_type'] == 'straight':
+        points = get_datapoints(config['n_samples'])
+        dataset = StraightLine(num_images=len(points))
+        for i in range(len(points)):
+            img, meta = dataset.get_item(i, line_coords=points[i], n_black_pixels=config['line_interrupt'])
+            yield img, meta
 
-    points = get_datapoints(config['n_samples'])
-    dataset = StraightLine(num_images=len(points))
-    for i in range(len(points)):
-        img, meta = dataset.get_item(i, line_coords=points[i], n_black_pixels=config['line_interrupt'])
-        yield img, meta
+    elif config['line_type'] == 'curved':
+        dataset = SplineLine(num_images=config['n_samples'])
+        for i in range(config['n_samples']):
+            img, meta = dataset[i]
+            yield img, meta
+
+    else:
+        raise ValueError(f"Unknown line type: {config['line_type']}")
 
 
 def merge_alt_channels(config: Dict[str, Optional[Any]], lateral_features: List[Tensor]) -> List[Tensor]:
@@ -463,7 +478,7 @@ def process_data(
     avg_line_recon_accuracy_meter = AverageMeter()
     avg_recon_accuracy_meter, avg_recon_recall_meter, avg_recon_precision_meter = (AverageMeter(), AverageMeter(),
                                                                                    AverageMeter())
-    fp = (f"../tmp/{config['config']}/th-{str(config['lateral_model']['s2_params']['act_threshold'])}_sf-{config['lateral_model']['s2_params']['square_factor'][0]}-{config['lateral_model']['s2_params']['square_factor'][-1]}/{'noise-' + str(config['noise']) if config['noise'] > 0 else 'no-noise'}_li-"
+    fp = (f"../tmp/spline/{config['config']}/th-{str(config['lateral_model']['s2_params']['act_threshold'])}_sf-{config['lateral_model']['s2_params']['square_factor'][0]}-{config['lateral_model']['s2_params']['square_factor'][-1]}/{'noise-' + str(config['noise']) if config['noise'] > 0 else 'no-noise'}_li-"
           f"{config['line_interrupt']}.mp4")
 
     if not Path(fp).parent.exists():
@@ -471,6 +486,7 @@ def process_data(
 
     if Path(fp).exists():
         Path(fp).unlink()
+    print(fp)
     out = cv2.VideoWriter(fp, cv2.VideoWriter_fourcc(*'mp4v'), config['fps'],
                           (ci.width, ci.height))
     for i, img in tqdm(enumerate(generator), total=config["n_samples"]):
@@ -561,6 +577,7 @@ def store_experiment_results(noise_reduction: float,
     :param config: Configuration
     """
     fp = f"../tmp/{config['config']}/experiment_results.json"
+    print(fp)
     with open(fp, "a") as f:
         json.dump({'config': config, 'noise_reduction': noise_reduction,
                    'avg_line_recon_accuracy_meter': avg_line_recon_accuracy_meter, 'recon_accuracy': recon_accuracy,
