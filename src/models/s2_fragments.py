@@ -56,7 +56,6 @@ class LateralLayer(nn.Module):
         :param locality_size: Size of the locality, i.e. how many neurons are connected to each other. For
         example, if locality_size = 2, then each neuron is connected to 5 neurons on each side of it.
         :param lr: Learning rate.
-        :param hebbian_rule: Which Hebbian rule to use.
         :param neg_corr: Whether to consider negative correlation during Hebbian updates.
         :param act_threshold: The activation threshold: Either "bernoulli" to sample from a Bernoulli distribution or
         a float value as fixed threshold
@@ -224,16 +223,15 @@ class LateralLayer(nn.Module):
 
                 assert x_lateral.shape[0] == 1, "only works with batch size = 1 atm."
 
-                # Shape w2: 5324, 40, 1
-                # Shape x2: 5324, 1, 1024
+                d1 = x.shape[2] * x.shape[3]
                 d2 = self.in_channels * self.kernel_size[0] * self.kernel_size[1]
                 w2 = (self.W_lateral.reshape(self.out_channels, d2, 1).permute(1, 0, 2) > 0).float()
-                x2 = x_rearranged.reshape(d2, 1, 1024).permute(0, 1, 2)
+                x2 = x_rearranged.reshape(d2, 1, d1).permute(0, 1, 2)
                 pos_corr = torch.matmul(w2, x2)  # 40,5324,1 * 40,1,1024
                 neg_corr = torch.matmul(w2, 1 - x2) + torch.matmul(1 - w2, x2)
-                pos_corr = pos_corr.permute(2, 1, 0).reshape(1024, self.in_feature_channels,
+                pos_corr = pos_corr.permute(2, 1, 0).reshape(d1, self.in_feature_channels,
                                                                self.n_alternative_cells, d2)
-                neg_corr = neg_corr.permute(2, 1, 0).reshape(1024, self.in_feature_channels,
+                neg_corr = neg_corr.permute(2, 1, 0).reshape(d1, self.in_feature_channels,
                                                                self.n_alternative_cells, d2)
 
                 # correlation shape: (batch_size*H*W, out_channels, alt_channels, in_channels*kernel_w*kernel_h)

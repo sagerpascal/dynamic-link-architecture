@@ -119,4 +119,6 @@ def loaders_from_config(config: Dict) -> Union[Any, Any, Any]:
         train_set=train_set,
         valid_set=valid_set,
         test_set=test_set,
+        batch_size=config["run"]["batch_size"],
+        num_workers=config["run"]["num_workers"],
     )

@@ -14,6 +14,8 @@ dataset:
 run:
   n_epochs: 101
   current_epoch: 0
+  batch_size: 1
+  num_workers: 0
   plots:
     enable: True
     only_last_epoch: False
