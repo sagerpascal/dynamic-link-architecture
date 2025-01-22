@@ -26,8 +26,6 @@ def get_data(file_path):
             result = {
                 'noise': data['config']['noise'],
                 'line_interrupt': data['config']['line_interrupt'],
-                'act_bias': round(0.5 - float(data['config']['lateral_model']['s2_params']['act_threshold']), 2),
-                'square_factor': replace_square_list(data['config']['lateral_model']['s2_params']['square_factor']),
                 'noise_reduction': data['noise_reduction'],
                 'avg_line_recon_accuracy_meter': data['avg_line_recon_accuracy_meter'],
                 'avg_line_recon_accuracy_meter_2': (data['avg_line_recon_accuracy_meter'] - 0.75) / 0.25,
@@ -35,6 +33,11 @@ def get_data(file_path):
                 'recon_recall': data['recon_recall'],
                 'recon_precision': data['recon_precision'],
             }
+
+            if 'lateral_model' in data['config']:
+                result['act_bias'] = round(float(data['config']['lateral_model']['s2_params']['act_threshold']), 2)
+                result['square_factor'] = replace_square_list(data['config']['lateral_model']['s2_params']['square_factor'])
+
             results.append(result)
     return pd.DataFrame.from_dict(results)
 
@@ -48,14 +51,14 @@ def feature_noise_to_location_noise(feature_noise, round_=False):
 
 
 def plot_line(data, x_key, x_label, y_key, y_label, z_key, z_label, plot_key, plot_label, xmin, xmax, ymin, ymax,
-              x2_func=None, x2_label=None, set_title=True, filename=None):
+              x2_func=None, x2_label=None, set_title=True, filename=None, data_ae=None):
 
     # if problems with font, run it on local machine
     # plt.rcParams["font.family"] = "Times New Roman"
     plt.rcParams["font.family"] = "Helvetica"
     plt.rcParams["font.size"] = 14
 
-    fig, axs = plt.subplots(ncols=len(data[plot_key].unique()), figsize=(13, 3), dpi=300)
+    fig, axs = plt.subplots(ncols=len(data[plot_key].unique()), figsize=(13, 4), dpi=300)
 
     for ic, (ax, pk) in enumerate(zip(axs, sorted(data[plot_key].unique()))):
         data_ = data[data[plot_key] == pk]
@@ -67,10 +70,14 @@ def plot_line(data, x_key, x_label, y_key, y_label, z_key, z_label, plot_key, pl
             z = data_[data_[z_key] == zv]
             ax.plot(z[x_key].values, z[y_key].values, label="{}{}".format(z_label, zv))
 
+        ax.plot(data_ae[x_key].values, data_ae[y_key].values, label="AE Baseline", linestyle='--', c='red')
+
         if set_title:
             ax.set_title("{}{}".format(plot_label, pk))
 
         ax.set_xlabel(x_label)
+        if 'noise' in x_key.lower():
+            ax.set_xticklabels(feature_noise_to_location_noise(ax.get_xticks(), round_=True))
         if ic == 0:
             ax.set_ylabel(y_label)
 
@@ -93,7 +100,7 @@ def plot_line(data, x_key, x_label, y_key, y_label, z_key, z_label, plot_key, pl
     plt.show()
 
 
-def plot(data, configname):
+def plot(data, configname, data_ae=None):
 
     def fname(x):
         return f"{configname}/{x}.png"
@@ -101,42 +108,51 @@ def plot(data, configname):
 
     # cleanup data
     data.loc[data.noise == 0, 'noise_reduction'] = 1.0
+    data_ae.loc[data_ae.noise == 0, 'noise_reduction'] = 1.0
 
     # plot noise only
+    if data_ae is not None:
+        data_ae_1 = data_ae[data_ae['line_interrupt'] == 0]
     data_1 = data[data['line_interrupt'] == 0]
-    plot_line(data_1, x_key="noise", x_label="Feature Noise", y_key="noise_reduction", y_label="Noise Reduction Rate",
+    plot_line(data_1, x_key="noise", x_label="Noise", y_key="noise_reduction", y_label="Noise Reduction Rate",
               z_key='act_bias', z_label='b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
-              x2_func=feature_noise_to_location_noise, x2_label="Spatial Noise", filename=fname("1_noise_reduction"),
-              xmin=-0.005, xmax=0.205, ymin=0.795, ymax=1.005)
+              x2_func=None, x2_label="Spatial Noise", filename=fname("1_noise_reduction"),
+              xmin=-0.005, xmax=0.205, ymin=0.795, ymax=1.005, data_ae=data_ae_1)
 
-    plot_line(data_1, x_key="noise", x_label="Feature Noise", y_key="recon_recall", y_label="Recall",
+    plot_line(data_1, x_key="noise", x_label="Noise", y_key="recon_recall", y_label="Recall",
               z_key='act_bias', z_label='b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
-              x2_func=feature_noise_to_location_noise, x2_label="Spatial Noise", set_title=False,
-              filename=fname("2_recon_recall"), xmin=-0.005, xmax=0.205, ymin=0.08, ymax=1.02)
+              x2_func=None, x2_label="Spatial Noise", set_title=False,
+              filename=fname("2_recon_recall"), xmin=-0.005, xmax=0.205, ymin=0.08, ymax=1.02, data_ae=data_ae_1)
 
-    plot_line(data_1, x_key="noise", x_label="Feature Noise", y_key="recon_precision", y_label="Precision",
+    plot_line(data_1, x_key="noise", x_label="Noise", y_key="recon_precision", y_label="Precision",
               z_key='act_bias', z_label='b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
-              x2_func=feature_noise_to_location_noise, x2_label="Spatial Noise", set_title=False,
-              filename=fname("3_recon_precision"), xmin=-0.005, xmax=0.205, ymin=0.08, ymax=1.02)
+              x2_func=None, x2_label="Spatial Noise", set_title=False,
+              filename=fname("3_recon_precision"), xmin=-0.005, xmax=0.205, ymin=0.08, ymax=1.02, data_ae=data_ae_1)
 
     # plot line interrupt only
+    if data_ae is not None:
+        data_ae_1 = data_ae[data_ae['noise'] == 0.0]
     data_1 = data[data['noise'] == 0.0]
+
     # set accuracy to 1 where line is not interrupted for the plot
     data_1.loc[data_1.line_interrupt == 0, 'avg_line_recon_accuracy_meter'] = 1.0
+    data_ae_1.loc[data_ae_1.line_interrupt == 0, 'avg_line_recon_accuracy_meter'] = 1.0
+
     plot_line(data_1, x_key="line_interrupt", x_label="Line Interrupt", y_key="avg_line_recon_accuracy_meter",
               y_label="Feature Reconstruction Rate", z_key='act_bias', z_label='b = ',
               plot_key='square_factor', plot_label='Power Factor γ = ', filename=fname("4_avg_line_recon_accuracy"),
-              xmin=-0.1, xmax=7.1, ymin=-0.02, ymax=1.02)
+              xmin=-0.1, xmax=7.1, ymin=-0.02, ymax=1.02, data_ae=data_ae_1)
     plot_line(data_1, x_key="line_interrupt", x_label="Line Interrupt", y_key="recon_recall", y_label="Recall",
               z_key='act_bias', z_label='b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
-              set_title=False, filename=fname("5_recon_recall"), xmin=-0.1, xmax=7.1, ymin=0.49, ymax=1.01)
+              set_title=False, filename=fname("5_recon_recall"), xmin=-0.1, xmax=7.1, ymin=0.49, ymax=1.01, data_ae=data_ae_1)
     plot_line(data_1, x_key="line_interrupt", x_label="Line Interrupt", y_key="recon_precision", y_label="Precision",
               z_key='act_bias', z_label='b = ', plot_key='square_factor', plot_label='Power Factor γ = ',
-              set_title=False, filename=fname("6_recon_precision"), xmin=-0.1, xmax=7.1, ymin=0.49, ymax=1.01)
+              set_title=False, filename=fname("6_recon_precision"), xmin=-0.1, xmax=7.1, ymin=0.49, ymax=1.01, data_ae=data_ae_1)
 
 
 if __name__ == '__main__':
+    data_ae = get_data(Path(".").absolute().parent / "tmp" / "autoencoder" / "experiment_results.json")
     for f in ['net-fragments']:
         file_path = Path(".").absolute().parent / "tmp" / f / "experiment_results.json"
         data = get_data(file_path)
-        plot(data, f)
+        plot(data, f, data_ae)
