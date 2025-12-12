@@ -1,6 +1,7 @@
-# The Dynamic Net Architecture
+# The Cooperative Network Architecture
 
-This repository contains the code of "The Dynamic Net Architecture: Learning Robust and Holistic Visual Representations Through Self-Organizing Networks."
+This repository contains the code of the paper [The Cooperative Network Architecture: Learning Structured Networks as Representation of Sensory Patterns](https://arxiv.org/pdf/2407.05650).
+
 Please note that the original code is available at [https://github.com/sagerpascal/lateral-connections](https://github.com/sagerpascal/lateral-connections), containing many more options (including a feedback layer S3 and more datasets).
 However, this repository contains a more recent version of the code, which is more modular and easier to use.
 All results in the paper have been re-created using this code.
